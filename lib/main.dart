@@ -9,10 +9,15 @@ import 'models/user_model.dart';
 import 'screens/client/login_screen.dart';
 import 'screens/client/register_screen.dart';
 import 'screens/client/home_screen.dart';
+import 'screens/client/cart_screen.dart'; // <--- DITAMBAHKAN
+import 'screens/client/orders_screen.dart'; // <--- DITAMBAHKAN
 import 'screens/admin/admin_login_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/admin/user_approval_screen.dart';
-// import 'screens/about_screen.dart';
+// import 'screens/about_screen.dart';          // <--- DITAMBAHKAN
+import 'screens/admin/orders_screen.dart';
+import 'screens/admin/products_screen.dart';
+import 'screens/admin/reports_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,23 +62,85 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginScreen(),
         '/register': (context) => RegisterScreen(),
         '/admin/login': (context) => AdminLoginScreen(),
-        // '/about': (context) => AboutScreen(),
+        // '/about': (context) => AboutScreen(), // Ditangani di onGenerateRoute
         '/admin/users': (context) => UserApprovalScreen(),
       },
       onGenerateRoute: (settings) {
         // Handle routes with arguments
         if (settings.name == '/client/home') {
-          final user = settings.arguments as User;
+          // ======================================
+          // PERBAIKAN untuk Login Customer/User
+          // ======================================
+          final arguments = settings.arguments;
+          if (arguments is Map<String, dynamic>) {
+            final user = User.fromJson(arguments);
+            return MaterialPageRoute(
+              builder: (context) => ClientHomeScreen(user: user),
+            );
+          }
+          // Jika argumen adalah Map (dari API Login), konversi.
+          // Jika bukan (misal: dari navigasi internal), bisa diabaikan/dicegah.
+        }
+
+        if (settings.name == '/admin/dashboard') {
+          // ======================================
+          // PERBAIKAN untuk Login Admin
+          // ======================================
+          final arguments = settings.arguments;
+          if (arguments is Map<String, dynamic>) {
+            final admin = Admin.fromJson(arguments);
+            return MaterialPageRoute(
+              builder: (context) => AdminDashboardScreen(admin: admin),
+            );
+          }
+        }
+        if (settings.name == '/admin/orders') {
+          final admin =
+              settings.arguments as Admin; // Asumsi argumen adalah objek Admin
           return MaterialPageRoute(
-            builder: (context) => ClientHomeScreen(user: user),
+            builder: (context) => AdminOrdersScreen(admin: admin),
           );
         }
-        if (settings.name == '/admin/dashboard') {
+
+        // Rute Baru: Kelola Produk
+        if (settings.name == '/admin/products') {
           final admin = settings.arguments as Admin;
           return MaterialPageRoute(
-            builder: (context) => AdminDashboardScreen(admin: admin),
+            builder: (context) => AdminProductsScreen(admin: admin),
           );
         }
+
+// Rute Baru: Laporan
+        if (settings.name == '/admin/reports') {
+          final admin = settings.arguments as Admin;
+          return MaterialPageRoute(
+            builder: (context) => AdminReportsScreen(admin: admin),
+          );
+        }
+        // ======================================
+        // Rute Baru dengan Argumen (dari ClientHomeScreen Drawer/Icon)
+        // ======================================
+        if (settings.name == '/client/cart') {
+          final user = settings.arguments as User;
+          return MaterialPageRoute(
+            builder: (context) => CartScreen(user: user),
+          );
+        }
+
+        if (settings.name == '/client/orders') {
+          final user = settings.arguments as User;
+          return MaterialPageRoute(
+            builder: (context) => OrdersScreen(user: user),
+          );
+        }
+
+        // Rute Baru Tanpa Argumen (dari Drawer atau RoleSelectionScreen)
+        // if (settings.name == '/about') {
+        //   return MaterialPageRoute(
+        //     builder: (context) => AboutScreen(),
+        //   );
+        // }
+
         return null;
       },
     );
@@ -86,9 +153,8 @@ class SplashScreen extends StatefulWidget {
   _SplashScreenState createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> 
+class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -97,7 +163,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 2000),
@@ -134,7 +200,8 @@ class _SplashScreenState extends State<SplashScreen>
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => RoleSelectionScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              RoleSelectionScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
@@ -198,7 +265,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 SizedBox(height: 40),
-                
+
                 // Animated Title
                 SlideTransition(
                   position: _slideAnimation,
@@ -246,7 +313,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 SizedBox(height: 60),
-                
+
                 // Loading Indicator
                 FadeTransition(
                   opacity: _fadeAnimation,
@@ -299,7 +366,7 @@ class RoleSelectionScreen extends StatelessWidget {
             child: Column(
               children: [
                 SizedBox(height: 40),
-                
+
                 // Logo and Title
                 Icon(
                   Icons.egg_outlined,
@@ -323,7 +390,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     color: Colors.grey[600],
                   ),
                 ),
-                
+
                 Expanded(
                   child: Center(
                     child: Column(
@@ -341,7 +408,7 @@ class RoleSelectionScreen extends StatelessWidget {
                           },
                         ),
                         SizedBox(height: 24),
-                        
+
                         // Admin Card
                         _buildRoleCard(
                           context: context,
@@ -350,17 +417,19 @@ class RoleSelectionScreen extends StatelessWidget {
                           subtitle: 'Kelola toko dan pesanan',
                           color: Colors.blue,
                           onTap: () {
-                            Navigator.pushReplacementNamed(context, '/admin/login');
+                            Navigator.pushReplacementNamed(
+                                context, '/admin/login');
                           },
                         ),
                       ],
                     ),
                   ),
                 ),
-                
+
                 // About Button
                 TextButton.icon(
                   onPressed: () {
+                    // Navigasi ke rute baru /about
                     Navigator.pushNamed(context, '/about');
                   },
                   icon: Icon(Icons.info_outline, size: 20),
@@ -370,7 +439,7 @@ class RoleSelectionScreen extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 16),
-                
+
                 // Footer
                 Text(
                   '© 2024 Toko Telur Gulung',
